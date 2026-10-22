@@ -1,0 +1,31 @@
+{
+  "repository": "gaudi/opus-mt-ja-en-ctranslate2",
+  "revision": "599e1e01d8e539db0eb9270e329bc5969803c20e",
+  "upstream": "Helsinki-NLP/opus-mt-ja-en",
+  "files": {
+    "README.md": {
+      "size": 6720,
+      "sha256": "9006142dc1858f00f6443d338e9bf24099c9496e4494cd65619bf76fd9a88633"
+    },
+    "config.json": {
+      "size": 215,
+      "sha256": "ce02c0c0d02f285d2ff34c80b0867ccb5c4a3b250a275e6d1d2884f5499a6e46"
+    },
+    "model.bin": {
+      "size": 151106205,
+      "sha256": "fcc505f9a24b43caf3514e5bc3fc1581bbe0b17cbf99d4eff136b7b5af4997e1"
+    },
+    "shared_vocabulary.json": {
+      "size": 1208862,
+      "sha256": "c6e7f9988e5fe15c59ed331ce2d7c3dd551e70add8efc09f839f5a48168da4d6"
+    },
+    "source.spm": {
+      "size": 781853,
+      "sha256": "d0b5c3b10b5959f056ff2c86e2f2356129242ff1fc72d3a4a34d6a8c0eee4e57"
+    },
+    "target.spm": {
+      "size": 801883,
+      "sha256": "35d89c704e270d441fade716a3931d49c43179400682edcca7f180694982a2f6"
+    }
+  }
+}

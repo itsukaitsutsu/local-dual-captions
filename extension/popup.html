@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Local Dual Captions</title><link rel="stylesheet" href="popup.css"></head>
+<body>
+  <header class="masthead">
+    <div class="mark" aria-hidden="true">あ<span>↗</span></div>
+    <div><h1>Dual Captions</h1><p>Japanese <span>→</span> English</p></div>
+    <span class="local-badge">ON DEVICE</span>
+  </header>
+  <main>
+    <section class="connection" aria-label="Runner connection">
+      <div class="status-row"><span class="dot" id="statusDot"></span><strong id="connectionLabel">Connect your local runner</strong><span class="backend" id="backend">—</span></div>
+      <p id="connectionDetail">Whisper transcription + offline translation.</p>
+      <details id="pairing" open>
+        <summary>Local connection settings <span>⌄</span></summary>
+        <div class="pairing-fields">
+          <label for="token">Pairing key <span>from Start.cmd</span></label>
+          <input id="token" type="password" placeholder="Paste your private pairing key" autocomplete="off" spellcheck="false">
+          <div class="port-row"><label for="port">127.0.0.1 : <input id="port" type="number" min="1024" max="65535" value="8765" aria-label="Local runner port"></label><button id="check" class="secondary">Check connection</button></div>
+        </div>
+      </details>
+    </section>
+
+    <div class="section-heading"><h2>Caption setup</h2><span>01 / AUDIO</span></div>
+    <div class="field"><label for="profile">Listening profile</label><select id="profile"><option value="fast">Fast · 3.2 s maximum window</option><option value="balanced">Balanced · 5.5 s maximum window</option><option value="context">More context · 8.5 s maximum window</option></select><p>Pauses can finish a window earlier. Speed also depends on your hardware.</p></div>
+    <div class="field"><label for="vadMode">Speech detection</label><select id="vadMode"><option value="0">Lenient · quiet speech</option><option value="2">Normal · recommended</option><option value="3">Strict · more background filtering</option></select></div>
+
+    <div class="section-heading"><h2>On-screen style</h2><span>02 / DISPLAY</span></div>
+    <div class="preview" aria-label="Caption style preview"><div class="preview-label"><i></i> DUAL CAPTION PREVIEW</div><p lang="ja" id="sampleJa">今日は、いい天気ですね。</p><p lang="en" id="sampleEn">It's a beautiful day today.</p></div>
+    <div class="two-col"><div class="field"><label for="position">Position</label><select id="position"><option value="bottom">Bottom</option><option value="top">Top</option></select></div><div class="field"><label for="showJapanese">Caption lines</label><select id="showJapanese"><option value="true">Japanese + English</option><option value="false">English only</option></select></div></div>
+    <div class="slider-field"><label for="fontSize">Text size <output id="fontValue">26 px</output></label><input id="fontSize" type="range" min="18" max="44" value="26"></div>
+    <div class="slider-field"><label for="opacity">Background <output id="opacityValue">90%</output></label><input id="opacity" type="range" min="55" max="100" value="90"></div>
+    <footer><span class="privacy-lock">▣</span> Models run locally. No cloud API or account.<br><span>Profile changes apply the next time you start.</span></footer>
+  </main>
+  <div class="actions">
+    <div id="error" class="error" role="alert" hidden></div>
+    <button id="start" class="primary"><span id="startIcon">▶</span><span id="startLabel">Caption this tab</span></button>
+    <div class="capture-info" id="captureInfo">Captures this tab's audio only, not your microphone.</div>
+    <div class="metrics" id="metrics" hidden><span id="latency">—</span><span id="rtf">—</span></div>
+  </div>
+  <script type="module" src="popup.js"></script>
+</body>
+</html>

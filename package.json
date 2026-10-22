@@ -1,0 +1,7 @@
+{
+  "name": "local-dual-captions",
+  "private": true,
+  "type": "module",
+  "version": "0.1.0",
+  "scripts": {"test": "node --test tests/extension.test.mjs"}
+}

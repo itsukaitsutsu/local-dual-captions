@@ -1,0 +1,9 @@
+# Runtime dependencies. Python 3.11 is recommended on Windows x64.
+fastapi==0.159.1
+starlette==1.9.0
+uvicorn==0.54.0
+websockets==17.3
+httpx==0.28.1
+webrtcvad-wheels==2.0.14.post1
+ctranslate2==4.8.3
+sentencepiece==0.2.2
