@@ -21,6 +21,16 @@ from .text import join_japanese, strip_overlap
 
 log = logging.getLogger("dual-captions")
 EXTENSION_ORIGIN = re.compile(r"^chrome-extension://([a-p]{32})$")
+# A silent client (closed laptop lid, crashed offscreen document, dead tab)
+# used to hold the single session lock forever and block every later session
+# with "Another caption session is active". Release it after this much quiet.
+IDLE_TIMEOUT_SECONDS = 45.0
+# If a source stops producing audio entirely (paused video, muted tab, capture
+# ended) the trailing phrase would sit in the buffer forever. Flush it after
+# this much silence on the wire. Heartbeat pings do not count as audio.
+AUDIO_GAP_SECONDS = 20.0
+# Time allowed to finish the trailing utterance when a session ends by itself.
+DRAIN_TIMEOUT_SECONDS = 8.0
 
 
 def create_app(config: Config, *, engine=None, translator=None,
@@ -103,9 +113,18 @@ def create_app(config: Config, *, engine=None, translator=None,
             dropped = 0
             caption_id = 0
 
+            busy = False
+
             async def send(payload):
                 async with send_lock:
                     await ws.send_json(payload)
+
+            async def warn(payload):
+                # Warnings must never kill the session, even on a dead socket.
+                try:
+                    await send(payload)
+                except Exception:  # noqa: BLE001 - connection already gone
+                    log.debug("Could not deliver a warning to the extension")
 
             async def enqueue(chunk):
                 nonlocal dropped
@@ -113,12 +132,12 @@ def create_app(config: Config, *, engine=None, translator=None,
                     pending.get_nowait()
                     pending.task_done()
                     dropped += 1
-                    await send({"type": "warning", "code": "overload", "dropped": dropped,
+                    await warn({"type": "warning", "code": "overload", "dropped": dropped,
                                 "message": "Engine is behind. An unprocessed audio chunk was skipped to stay live. Try Fast mode or a smaller/quantized model."})
                 pending.put_nowait(chunk)
 
             async def worker():
-                nonlocal caption_id
+                nonlocal caption_id, busy
                 last_raw = ""
                 last_end = -1.0
                 last_utterance = -1
@@ -126,6 +145,7 @@ def create_app(config: Config, *, engine=None, translator=None,
                 rolling = ""
                 while True:
                     chunk = await pending.get()
+                    busy = True
                     try:
                         if chunk.generation != segmenter.generation:
                             continue
@@ -170,24 +190,36 @@ def create_app(config: Config, *, engine=None, translator=None,
                     except Exception as exc:
                         # Never log user transcript or the request/pairing secret.
                         log.warning("Caption job failed (%s)", type(exc).__name__)
-                        await send({"type": "warning", "code": "inference",
+                        await warn({"type": "warning", "code": "inference",
                                     "message": "An inference job failed. Check the engine log and available memory; retry or use a smaller model."})
                     finally:
+                        busy = False
                         pending.task_done()
 
             task = asyncio.create_task(worker())
             await send({"type": "ready", "backend": config.backend, "profile": profile,
                         "sampleRate": 16000, "translationDevice": "cpu"})
+            connection_open = True
+            explicit_stop = False
+            last_audio_at = time.monotonic()
             try:
                 while True:
-                    message = await ws.receive()
+                    try:
+                        message = await asyncio.wait_for(ws.receive(), timeout=IDLE_TIMEOUT_SECONDS)
+                    except TimeoutError:
+                        await warn({"type": "warning", "code": "idle",
+                                    "message": f"No audio was received for {int(IDLE_TIMEOUT_SECONDS)} seconds. "
+                                               "This session was released so a new one can start."})
+                        break
                     if message["type"] == "websocket.disconnect":
+                        connection_open = False
                         break
                     data = message.get("bytes")
                     if data is not None:
                         if not data or len(data) > 32000 or len(data) % 2:
                             await ws.close(code=1009, reason="Expected at most one second of PCM16 audio")
                             break
+                        last_audio_at = time.monotonic()
                         for chunk in segmenter.feed(data):
                             await enqueue(chunk)
                     elif message.get("text"):
@@ -204,13 +236,27 @@ def create_app(config: Config, *, engine=None, translator=None,
                                 pending.task_done()
                             await send({"type": "reset"})
                         elif control.get("type") == "stop":
+                            explicit_stop = True
                             break
+                    if time.monotonic() - last_audio_at > AUDIO_GAP_SECONDS:
+                        for chunk in segmenter.flush():
+                            await enqueue(chunk)
+                        last_audio_at = time.monotonic()
             except (WebSocketDisconnect, RuntimeError):
-                pass
+                connection_open = False
             except ValueError:
                 with contextlib.suppress(Exception):
                     await ws.close(code=1008, reason="Invalid control message")
             finally:
+                # The last phrase only exists inside the segmenter's buffer until
+                # the silence gate closes or the stream ends. Without this flush,
+                # a video that simply ends never shows its final caption.
+                if connection_open and not explicit_stop:
+                    for chunk in segmenter.flush():
+                        await enqueue(chunk)
+                    deadline = time.monotonic() + DRAIN_TIMEOUT_SECONDS
+                    while (busy or not pending.empty()) and time.monotonic() < deadline:
+                        await asyncio.sleep(0.1)
                 task.cancel()
                 with contextlib.suppress(asyncio.CancelledError, WebSocketDisconnect, RuntimeError):
                     await task
